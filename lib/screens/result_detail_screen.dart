@@ -1,163 +1,187 @@
 // lib/screens/result_detail_screen.dart
 import 'package:flutter/material.dart';
-import 'dart:convert';
-import '../models/question.dart';
 
-class ResultDetailScreen extends StatefulWidget {
+class ResultDetailScreen extends StatelessWidget {
   final Map<String, dynamic> result;
-  final List<Question> allQuestions;
+  final List<Map<String, dynamic>> resultDetails;
 
   const ResultDetailScreen({
-    super.key,
+    Key? key,
     required this.result,
-    required this.allQuestions,
-  });
-
-  @override
-  State<ResultDetailScreen> createState() => _ResultDetailScreenState();
-}
-
-class _ResultDetailScreenState extends State<ResultDetailScreen> {
-  late Map<int, String> userAnswers;
-
-  @override
-  void initState() {
-    super.initState();
-    try {
-      final decodedAnswers = json.decode(widget.result['answers']);
-      userAnswers = decodedAnswers.map((key, value) => MapEntry(int.parse(key), value.toString()));
-    } catch (e) {
-      userAnswers = {};
-    }
-  }
+    required this.resultDetails,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Chi tiết bài thi'),
-      ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Bảng tổng quan kết quả
-              Card(
-                elevation: 2,
-                margin: const EdgeInsets.only(bottom: 20),
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Kết quả: ${widget.result['passed'] == 1 ? 'ĐẠT' : 'TRƯỢT'}',
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: widget.result['passed'] == 1 ? Colors.green : Colors.red,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Ngày thi: ${DateTime.parse(widget.result['taken_at']).day}/${DateTime.parse(widget.result['taken_at']).month}/${DateTime.parse(widget.result['taken_at']).year}',
-                        style: const TextStyle(fontSize: 16),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Điểm số: ${widget.result['score']}/${widget.result['total']}',
-                        style: const TextStyle(fontSize: 16),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const Text(
-                'Chi tiết các câu hỏi:',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 10),
-              // Danh sách chi tiết từng câu hỏi
-              ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: widget.allQuestions.length,
-                itemBuilder: (context, index) {
-                  final question = widget.allQuestions[index];
-                  final userAnswer = userAnswers[index];
-                  final isCorrect = userAnswer == question.ansright;
+    final passed = result['passed'] == 1;
+    final takenAtStr = (result['taken_at'] ?? '').toString();
+    DateTime? takenAt;
+    try {
+      takenAt =
+          takenAtStr.isNotEmpty ? DateTime.parse(takenAtStr) : null;
+    } catch (_) {
+      takenAt = null;
+    }
 
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    elevation: 1,
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Câu ${index + 1}: ${question.content}',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+    return Scaffold(
+      backgroundColor: const Color(0xFF003366),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF003366),
+        title: const Text("Chi tiết bài thi"),
+      ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Header
+            Padding(
+              padding:
+                  const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+              child: Row(
+                children: [
+                  Icon(
+                    passed ? Icons.check_circle : Icons.cancel,
+                    color: passed ? Colors.greenAccent : Colors.redAccent,
+                    size: 32,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Kết quả: ${passed ? "ĐẠT" : "TRƯỢT"}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
                           ),
-                          if (question.mandatory)
-                            const Padding(
-                              padding: EdgeInsets.only(top: 4.0),
-                              child: Row(
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          takenAt != null
+                              ? 'Ngày: ${takenAt.day}/${takenAt.month}/${takenAt.year}'
+                              : 'Ngày: -',
+                          style: const TextStyle(color: Colors.white70),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Nội dung chi tiết
+            Expanded(
+              child: Container(
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(20),
+                      topRight: Radius.circular(20)),
+                ),
+                child: resultDetails.isEmpty
+                    ? const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(20.0),
+                          child: Text(
+                            'Không tìm thấy chi tiết bài thi.',
+                            style: TextStyle(fontSize: 16),
+                          ),
+                        ),
+                      )
+                    : ListView.separated(
+                        padding: const EdgeInsets.all(12),
+                        itemCount: resultDetails.length,
+                        separatorBuilder: (_, __) =>
+                            const SizedBox(height: 10),
+                        itemBuilder: (context, index) {
+                          final d = resultDetails[index];
+                          final content = (d['content'] ?? '').toString();
+                          final img = (d['image'] ?? '').toString();
+                          final userAnswer =
+                              (d['user_answer'] ?? '').toString();
+                          final correct =
+                              (d['ansright'] ?? '').toString();
+
+                          return Card(
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                            elevation: 2,
+                            child: Padding(
+                              padding: const EdgeInsets.all(12.0),
+                              child: Column(
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.start,
                                 children: [
-                                  Icon(Icons.star, color: Colors.red, size: 14),
-                                  SizedBox(width: 4),
                                   Text(
-                                    '(Câu điểm liệt)',
-                                    style: TextStyle(color: Colors.red, fontStyle: FontStyle.italic, fontSize: 13),
+                                    'Câu ${index + 1}: $content',
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold),
                                   ),
+                                  if (img.isNotEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 8.0),
+                                      child: Image.asset(
+                                        img,
+                                        errorBuilder: (c, e, s) =>
+                                            const SizedBox.shrink(),
+                                      ),
+                                    ),
+                                  const SizedBox(height: 6),
+                                  _buildOption(
+                                      "A",
+                                      (d['ansa'] ?? '').toString(),
+                                      userAnswer,
+                                      correct),
+                                  _buildOption(
+                                      "B",
+                                      (d['ansb'] ?? '').toString(),
+                                      userAnswer,
+                                      correct),
+                                  if (((d['ansc'] ?? '').toString())
+                                      .isNotEmpty)
+                                    _buildOption(
+                                        "C",
+                                        (d['ansc'] ?? '').toString(),
+                                        userAnswer,
+                                        correct),
+                                  if (((d['ansd'] ?? '').toString())
+                                      .isNotEmpty)
+                                    _buildOption(
+                                        "D",
+                                        (d['ansd'] ?? '').toString(),
+                                        userAnswer,
+                                        correct),
                                 ],
                               ),
                             ),
-                          if (question.image != null && question.image!.isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 12.0),
-                              child: Image.asset(question.image!),
-                            ),
-                          _buildAnswerOption('A', question.ansa, userAnswer, question.ansright),
-                          _buildAnswerOption('B', question.ansb, userAnswer, question.ansright),
-                          if (question.ansc.isNotEmpty)
-                            _buildAnswerOption('C', question.ansc, userAnswer, question.ansright),
-                          if (question.ansd.isNotEmpty)
-                            _buildAnswerOption('D', question.ansd, userAnswer, question.ansright),
-                        ],
+                          );
+                        },
                       ),
-                    ),
-                  );
-                },
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildAnswerOption(String label, String text, String? userAnswer, String correctAnswer) {
-    if (text.isEmpty) {
-      return const SizedBox.shrink();
-    }
-    
-    final isCorrectAnswer = label == correctAnswer;
-    final isUserSelected = userAnswer == label;
-    
-    Color color = Colors.black;
-    IconData? icon;
+  Widget _buildOption(
+      String label, String text, String userAnswer, String correctAnswer) {
+    if (text.trim().isEmpty) return const SizedBox.shrink();
 
-    if (isUserSelected) {
-      color = isCorrectAnswer ? Colors.green : Colors.red;
-      icon = isCorrectAnswer ? Icons.check_circle_outline : Icons.close;
-    } else if (isCorrectAnswer) {
+    final isCorrect = label == correctAnswer;
+    final isUser = userAnswer == label;
+
+    Color color = Colors.black87;
+    IconData? icon;
+    if (isUser) {
+      color = isCorrect ? Colors.green : Colors.red;
+      icon = isCorrect ? Icons.check_circle : Icons.close;
+    } else if (isCorrect) {
       color = Colors.green;
-      icon = Icons.check_circle_outline;
-    } else {
-      color = Colors.black54;
+      icon = Icons.check_circle;
     }
 
     return Padding(
@@ -165,13 +189,12 @@ class _ResultDetailScreenState extends State<ResultDetailScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (icon != null)
-            Icon(icon, color: color, size: 20),
-          const SizedBox(width: 8),
+          if (icon != null) Icon(icon, color: color, size: 20),
+          if (icon != null) const SizedBox(width: 8),
           Expanded(
             child: Text(
               '$label. $text',
-              style: TextStyle(color: color, fontWeight: isCorrectAnswer ? FontWeight.bold : FontWeight.normal),
+              style: TextStyle(color: color),
             ),
           ),
         ],

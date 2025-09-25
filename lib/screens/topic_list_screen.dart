@@ -31,42 +31,74 @@ class _TopicListScreenState extends State<TopicListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFF0D47A1),
       appBar: AppBar(
-        title: const Text('Học lý thuyết'),
+        title: const Text(
+          'Học lý thuyết',
+          style: TextStyle(color: Colors.white),
+        ),
+        backgroundColor: const Color(0xFF0D47A1),
+        iconTheme: const IconThemeData(color: Colors.white),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _topics.isEmpty
-              ? const Center(child: Text('Không có chương nào để học.'))
-              : ListView.builder(
-                  itemCount: _topics.length,
-                  itemBuilder: (context, index) {
-                    final topic = _topics[index];
-                    return Card(
-                      margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
-                      child: ListTile(
-                        title: Text(
-                          topic.title,
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        subtitle: Text(topic.description),
-                        trailing: const Icon(Icons.arrow_forward_ios),
-                        onTap: () {
-                          // Điều hướng đến màn hình hiển thị câu hỏi của chương
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => TheoryScreen(
-                                topicId: topic.id,
-                                topicTitle: topic.title,
-                              ),
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24.0),
+          child: Card(
+            elevation: 8,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _isLoading
+                      ? const Padding(
+                          padding: EdgeInsets.all(20.0),
+                          child: CircularProgressIndicator(),
+                        )
+                      : _topics.isEmpty
+                          ? const Padding(
+                              padding: EdgeInsets.all(20.0),
+                              child: Text('Không có chương nào để học.'),
+                            )
+                          : ListView.builder(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: _topics.length,
+                              itemBuilder: (context, index) {
+                                final topic = _topics[index];
+                                return Card(
+                                  margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 8.0),
+                                  child: ListTile(
+                                    title: Text(
+                                      topic.title,
+                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                    ),
+                                    subtitle: Text(topic.description),
+                                    trailing: const Icon(Icons.arrow_forward_ios),
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => TheoryScreen(
+                                            topicId: topic.id,
+                                            topicTitle: topic.title,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                );
+                              },
                             ),
-                          );
-                        },
-                      ),
-                    );
-                  },
-                ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

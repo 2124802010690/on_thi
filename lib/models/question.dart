@@ -1,17 +1,16 @@
 class Question {
-  int? id;
-  int topicId;
-  String title;        // 👈 thêm
-  String content;
-  String? image;       // 👈 thêm (có thể null)
-  String ansa, ansb, ansc, ansd, ansright;
-  String? anshint;     // 👈 thêm
-  bool mandatory;
+  final int id;
+  final String content;
+  final String? image;
+  final String ansa;
+  final String ansb;
+  final String ansc;
+  final String ansd;
+  final String ansright;
+  final bool mandatory;
 
   Question({
-    this.id,
-    required this.topicId,
-    required this.title,     // 👈 constructor thêm
+    required this.id,
     required this.content,
     this.image,
     required this.ansa,
@@ -19,22 +18,20 @@ class Question {
     required this.ansc,
     required this.ansd,
     required this.ansright,
-    this.anshint,
-    this.mandatory = false,
+    required this.mandatory,
   });
 
-  factory Question.fromMap(Map<String, dynamic> m) => Question(
-        id: m['id'] as int?,
-        topicId: m['topic_id'] as int,
-        title: m['title'] as String? ?? '',          // 👈 lấy title
-        content: m['content'] as String? ?? '',
-        image: m['image'] as String?,                // 👈 lấy image (nullable)
-        ansa: m['ansa'] as String? ?? '',
-        ansb: m['ansb'] as String? ?? '',
-        ansc: m['ansc'] as String? ?? '',
-        ansd: m['ansd'] as String? ?? '',
-        ansright: m['ansright'] as String? ?? '',
-        anshint: m['anshint'] as String?,            // 👈 lấy hint
-        mandatory: (m['mandatory'] as int? ?? 0) == 1,
-      );
+  factory Question.fromMap(Map<String, dynamic> map) {
+    return Question(
+      id: map['id'] as int,
+      content: (map['content'] ?? '') as String,
+      image: map['image'] as String?,  // cho phép null
+      ansa: (map['ansa'] ?? '') as String,
+      ansb: (map['ansb'] ?? '') as String,
+      ansc: (map['ansc'] ?? '') as String,
+      ansd: (map['ansd'] ?? '') as String,
+      ansright: (map['ansright'] ?? '') as String,
+      mandatory: (map['mandatory'] ?? 0) == 1,
+    );
+  }
 }
