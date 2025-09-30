@@ -46,69 +46,62 @@ class _QuizScreenState extends State<QuizScreen> {
     });
   }
 
-void finishExam({bool auto = false}) async {
-  _timer.cancel();
+  void finishExam({bool auto = false}) async {
+    // Ngừng bộ đếm thời gian
+    _timer.cancel();
 
-  int correct = 0;
-  bool failedMandatory = false;
+    int correct = 0;
+    bool failedMandatory = false;
 
-  for (int i = 0; i < widget.questions.length; i++) {
-    final q = widget.questions[i];
-    final selected = answers[i];
-    if (selected != null && selected == q.ansright) {
-      correct++;
-    }
-    if (q.mandatory && (selected == null || selected != q.ansright)) {
-      failedMandatory = true;
-    }
-  }
-
-  final passed = (!failedMandatory) && (correct >= 28);
-
-  try {
-    // 1. Lưu kết quả vào bảng results
-    int resultId = await DBHelper().insertResult(
-      1,   // tạm để userId = 1 (sau này thay bằng id user login)
-      correct,
-      widget.questions.length,
-      passed ? 1 : 0,
-      DateTime.now().toIso8601String(),
-    );
-
-    // 2. Chuẩn bị danh sách chi tiết
-    List<Map<String, dynamic>> detailsList = [];
     for (int i = 0; i < widget.questions.length; i++) {
       final q = widget.questions[i];
       final selected = answers[i];
-      detailsList.add({
-        'question_id': q.id,
-        'user_answer': selected ?? '',
-        'is_correct': (selected == q.ansright) ? 1 : 0,
-      });
+      if (selected != null && selected == q.ansright) {
+        correct++;
+      }
+      // Kiểm tra câu hỏi điểm liệt
+      if (q.mandatory && (selected == null || selected != q.ansright)) {
+        failedMandatory = true;
+      }
     }
 
-    // 3. Lưu chi tiết vào result_details
-    await DBHelper().insertResultDetails(resultId, detailsList);
+    final passed = (!failedMandatory) && (correct >= 28);
+    Map<String, String> stringAnswers = answers.map(
+      (key, value) => MapEntry(key.toString(), value),
+    );
 
-  } catch (e) {
-    debugPrint('Lỗi khi lưu kết quả: $e');
-  }
+    // Lưu kết quả vào cơ sở dữ liệu
+    try {
+      await DBHelper().insertResult({
+        'user_id': 1, // Bạn có thể thay đổi user_id tùy theo logic ứng dụng
+        'score': correct,
+        'total': widget.questions.length,
+        'passed': passed ? 1 : 0,
+        'failed_due_mandatory': failedMandatory ? 1 : 0,
+        'taken_at': DateTime.now().toIso8601String(),
+        'answers': json.encode(stringAnswers),
+      });
+    } catch (e) {
+      debugPrint('Lỗi khi lưu kết quả: $e');
+    }
 
-  if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
 
-  // 4. Chuyển sang màn hình kết quả
-  Navigator.pushReplacement(
-    context,
-    MaterialPageRoute(
-      builder: (_) => ResultScreen(
-        questions: widget.questions,
-        answers: answers,
-        isPassed: passed,
-        correctCount: correct,
+    // Điều hướng sang màn hình kết quả và thay thế màn hình hiện tại
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ResultScreen(
+          questions: widget.questions,
+          answers: answers,
+          isPassed: passed,
+          correctCount: correct,
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   @override
   void dispose() {

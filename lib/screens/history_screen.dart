@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/db_helper.dart';
+import '../models/question.dart';
 import 'result_detail_screen.dart';
 
 class HistoryScreen extends StatefulWidget {
@@ -11,6 +12,7 @@ class HistoryScreen extends StatefulWidget {
 
 class _HistoryScreenState extends State<HistoryScreen> {
   List<Map<String, dynamic>> _results = [];
+  List<Question> _allQuestions = [];
   bool _isLoading = true;
 
   @override
@@ -21,9 +23,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   Future<void> _loadData() async {
     final dbHelper = DBHelper();
-    final results = await dbHelper.getResultsByUserId(1); // user_id = 1
+    final results = await dbHelper.getResultsByUserId(1);
+    final allQuestions = await dbHelper.getAllQuestions();
+
     setState(() {
       _results = results;
+      _allQuestions = allQuestions;
       _isLoading = false;
     });
   }
@@ -31,18 +36,22 @@ class _HistoryScreenState extends State<HistoryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF003366),
+      backgroundColor: const Color(0xFF003366), // nền xanh hải quân
       body: SafeArea(
         child: Column(
           children: [
+            // Header có nút quay về
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
+                  // Nút quay về màn hình trước
                   IconButton(
                     icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28),
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: () {
+                      Navigator.pop(context);
+                    },
                   ),
                   const Text(
                     'Lịch sử thi',
@@ -52,10 +61,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       color: Colors.white,
                     ),
                   ),
-                  const SizedBox(width: 40),
+                  const SizedBox(width: 40), // để cân đối layout
                 ],
               ),
             ),
+
+            // Nội dung
             Expanded(
               child: Container(
                 decoration: const BoxDecoration(
@@ -71,7 +82,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         ? const Center(
                             child: Text(
                               'Bạn chưa thực hiện bài thi nào.',
-                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           )
                         : ListView.builder(
@@ -79,9 +93,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             itemCount: _results.length,
                             itemBuilder: (context, index) {
                               final result = _results[index];
-                              final takenAt = DateTime.parse(result['taken_at']);
-                              final resultText = result['passed'] == 1 ? 'ĐẠT' : 'TRƯỢT';
-                              final resultColor = result['passed'] == 1 ? Colors.green : Colors.red;
+                              final takenAt =
+                                  DateTime.parse(result['taken_at']);
+                              final resultText =
+                                  result['passed'] == 1 ? 'ĐẠT' : 'TRƯỢT';
+                              final resultColor =
+                                  result['passed'] == 1 ? Colors.green : Colors.red;
 
                               return Card(
                                 shape: RoundedRectangleBorder(
@@ -95,14 +112,18 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                     radius: 25,
                                     backgroundColor: resultColor.withOpacity(0.1),
                                     child: Icon(
-                                      result['passed'] == 1 ? Icons.check_circle : Icons.cancel,
+                                      result['passed'] == 1
+                                          ? Icons.check_circle
+                                          : Icons.cancel,
                                       color: resultColor,
                                       size: 28,
                                     ),
                                   ),
                                   title: Text(
                                     'Bài thi ngày ${takenAt.day}/${takenAt.month}/${takenAt.year}',
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16),
                                   ),
                                   subtitle: Text(
                                     'Điểm: ${result['score']}/${result['total']}',
@@ -116,14 +137,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                       fontSize: 16,
                                     ),
                                   ),
-                                  onTap: () async {
-                                    final details = await DBHelper().getResultDetails(result['id']);
+                                  onTap: () {
                                     Navigator.push(
                                       context,
                                       MaterialPageRoute(
                                         builder: (context) => ResultDetailScreen(
                                           result: result,
-                                          resultDetails: details,
+                                          allQuestions: _allQuestions,
                                         ),
                                       ),
                                     );

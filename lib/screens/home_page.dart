@@ -1,25 +1,22 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../services/db_helper.dart';
 import '../models/question.dart';
 import 'quiz_screen.dart';
 import 'topic_list_screen.dart';
 import 'history_screen.dart';
 import 'profile_screen.dart';
+import 'chat_screen.dart';
 
 class HomePage extends StatefulWidget {
-  final Map<String, dynamic>? user; // Cho phép user có thể là null
-  const HomePage({super.key, this.user});
+  final Map<String, dynamic> user;
+  const HomePage({super.key, required this.user});
 
   @override
   State<HomePage> createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
-  late Map<String, dynamic> user;
   bool loading = false;
   final List<String> banners = [
     'assets/images/banner1.png',
@@ -32,10 +29,6 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    // Khởi tạo user với dữ liệu từ widget.user hoặc một Map rỗng nếu widget.user là null
-    user = widget.user ?? {};
-    _loadUserFromSharedPreferences(); // Tải dữ liệu từ SharedPreferences ngay khi màn hình được tạo
-
     _pageController = PageController();
     _timer = Timer.periodic(const Duration(seconds: 3), (Timer timer) {
       if (_pageController.hasClients) {
@@ -54,17 +47,6 @@ class _HomePageState extends State<HomePage> {
     _pageController.dispose();
     _timer.cancel();
     super.dispose();
-  }
-
-  // Hàm mới để tải lại thông tin người dùng từ SharedPreferences
-  Future<void> _loadUserFromSharedPreferences() async {
-    final prefs = await SharedPreferences.getInstance();
-    final userData = prefs.getString('user');
-    if (userData != null) {
-      setState(() {
-        user = jsonDecode(userData);
-      });
-    }
   }
 
   void startExam() async {
@@ -91,7 +73,7 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0D47A1),
+      backgroundColor: const Color(0xFF0D47A1), // nền xanh giống login
       body: Center(
         child: SingleChildScrollView(
           child: Padding(
@@ -99,33 +81,33 @@ class _HomePageState extends State<HomePage> {
             child: Card(
               elevation: 8,
               shape: RoundedRectangleBorder(
-borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(20),
               ),
               child: Padding(
                 padding: const EdgeInsets.all(24.0),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    // Avatar user phía trên
                     GestureDetector(
-                      onTap: () async {
-                        await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => ProfileScreen(user: user),
-                          ),
-                        );
-                        _loadUserFromSharedPreferences();
-                      },
+                      onTap: () {
+Navigator.push(
+  context,
+  MaterialPageRoute(
+    builder: (_) => ProfileScreen(user: widget.user), // thêm ()
+  ),
+);
+   },
                       child: CircleAvatar(
                         radius: 40,
-                        backgroundImage: (user['avatar'] != null && File(user['avatar']).existsSync())
-                            ? FileImage(File(user['avatar'])) as ImageProvider
+                        backgroundImage: widget.user['avatar'] != null
+                            ? AssetImage(widget.user['avatar'])
                             : const AssetImage("assets/images/avatar.png"),
                       ),
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      "Xin chào, ${user['name'] ?? 'Học viên'} 👋",
+                      "Xin chào, ${widget.user['name'] ?? 'Học viên'} 👋",
                       style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
@@ -133,6 +115,8 @@ borderRadius: BorderRadius.circular(20),
                       ),
                     ),
                     const SizedBox(height: 20),
+
+                    // Banner
                     SizedBox(
                       height: 150,
                       child: PageView.builder(
@@ -147,6 +131,8 @@ borderRadius: BorderRadius.circular(20),
                       ),
                     ),
                     const SizedBox(height: 20),
+
+                    // Các chức năng chính
                     GridView.count(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
@@ -166,7 +152,7 @@ borderRadius: BorderRadius.circular(20),
                         ),
                         _buildActionButton(
                           icon: Icons.access_time,
-label: 'Thi sát hạch',
+                          label: 'Thi sát hạch',
                           onTap: startExam,
                           isLoading: loading,
                         ),
@@ -182,13 +168,12 @@ label: 'Thi sát hạch',
                         ),
                         _buildActionButton(
                           icon: Icons.person,
-                          label: 'Thông tin cá nhân',
-                          onTap: () async {
-                            await Navigator.push(
+                          label: 'ChatBot',
+                          onTap: () {
+                            Navigator.push(
                               context,
-                              MaterialPageRoute(builder: (context) => ProfileScreen(user: user)),
+                              MaterialPageRoute(builder: (context) => ChatScreen()),
                             );
-                            _loadUserFromSharedPreferences();
                           },
                         ),
                       ],

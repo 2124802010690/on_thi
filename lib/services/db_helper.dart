@@ -185,118 +185,62 @@ Future<Database> _initDB() async {
     );
   }
 
-  Future<List<Map<String, dynamic>>> getExamQuestions() async {
-    final db = await database;
-    List<Map<String, dynamic>> exam = [];
-    final int totalQuestionsNeeded = 30; // Tổng số câu hỏi cần có
+Future<List<Map<String, dynamic>>> getExamQuestions() async {
+  final db = await database;
+  List<Map<String, dynamic>> exam = [];
+  final int totalQuestionsNeeded = 30; // Tổng số câu hỏi cần có
 
-    // Lấy tất cả các chủ đề
-    final topics = await db.query('topics', orderBy: 'pos');
-    if (topics.isEmpty) return [];
+  // Lấy tất cả các chủ đề
+  final topics = await db.query('topics', orderBy: 'pos');
+  if (topics.isEmpty) return [];
 
-    // 1. Lấy một số câu hỏi cơ sở từ mỗi chủ đề
-    int baseCountPerTopic = 5; // Bắt đầu với 5 câu hỏi mỗi chủ đề
-    
-    for (var topic in topics) {
-      final topicId = topic['id'] as int;
-      final qs = await db.query(
-        'questions',
-        where: 'topic_id = ?',
-        whereArgs: [topicId],
-        orderBy: 'RANDOM()', // Lấy ngẫu nhiên
-        limit: baseCountPerTopic,
-      );
-      exam.addAll(qs);
-    }
-
-    // 2. Kiểm tra xem cần bổ sung bao nhiêu câu nữa
-    int questionsNeeded = totalQuestionsNeeded - exam.length;
-
-    // 3. Nếu thiếu, lấy thêm các câu hỏi ngẫu nhiên từ toàn bộ kho
-    if (questionsNeeded > 0) {
-      final remainingQuestions = await db.query(
-        'questions',
-        where: 'id NOT IN (${exam.map((q) => q['id']).join(',')})', // Loại trừ các câu đã có
-        orderBy: 'RANDOM()',
-        limit: questionsNeeded,
-      );
-      exam.addAll(remainingQuestions);
-    }
-
-    // 4. Trộn ngẫu nhiên danh sách cuối cùng để các câu hỏi không bị theo thứ tự chủ đề
-    exam.shuffle();
-
-    return exam;
+  // 1. Lấy một số câu hỏi cơ sở từ mỗi chủ đề
+  int baseCountPerTopic = 5; // Bắt đầu với 5 câu hỏi mỗi chủ đề
+  
+  for (var topic in topics) {
+    final topicId = topic['id'] as int;
+    final qs = await db.query(
+      'questions',
+      where: 'topic_id = ?',
+      whereArgs: [topicId],
+      orderBy: 'RANDOM()', // Lấy ngẫu nhiên
+      limit: baseCountPerTopic,
+    );
+    exam.addAll(qs);
   }
-    // Thêm kết quả thi
-// Thêm kết quả tổng quan
-Future<int> insertResult(int userId, int score, int total, int passed, String takenAt) async {
-  final db = await database;
-  return await db.insert('results', {
-    'user_id': userId,
-    'score': score,
-    'total': total,
-    'passed': passed,
-    'taken_at': takenAt,
-  });
+
+  // 2. Kiểm tra xem cần bổ sung bao nhiêu câu nữa
+  int questionsNeeded = totalQuestionsNeeded - exam.length;
+
+  // 3. Nếu thiếu, lấy thêm các câu hỏi ngẫu nhiên từ toàn bộ kho
+  if (questionsNeeded > 0) {
+    final remainingQuestions = await db.query(
+      'questions',
+      where: 'id NOT IN (${exam.map((q) => q['id']).join(',')})', // Loại trừ các câu đã có
+      orderBy: 'RANDOM()',
+      limit: questionsNeeded,
+    );
+    exam.addAll(remainingQuestions);
+  }
+
+  // 4. Trộn ngẫu nhiên danh sách cuối cùng để các câu hỏi không bị theo thứ tự chủ đề
+  exam.shuffle();
+
+  return exam;
 }
-// Lấy danh sách kết quả theo userId (hiển thị trong HistoryScreen)
-Future<List<Map<String, dynamic>>> getResultsByUserId(int userId) async {
-  final db = await database;
-  return await db.query(
-    'results',
-    where: 'user_id = ?',
-    whereArgs: [userId],
-    orderBy: 'taken_at DESC', // sắp xếp mới nhất lên đầu
-  );
-}
-
-
-// Thêm chi tiết từng câu hỏi
-Future<void> insertResultDetails(int resultId, List<Map<String, dynamic>> details) async {
-  final db = await database;
-  await db.transaction((txn) async {
-    for (var detail in details) {
-      await txn.insert('result_details', {
-        'result_id': resultId,
-        'question_id': detail['question_id'],
-        'user_answer': detail['user_answer'],
-        'is_correct': detail['is_correct'],
-      });
-    }
-  });
-}
-
-
-// Lấy chi tiết kết quả theo resultId
-Future<List<Map<String, dynamic>>> getResultDetails(int resultId) async {
-  final db = await database;
-  final rows = await db.rawQuery('''
-    SELECT rd.id, rd.user_answer, rd.is_correct,
-           q.id as question_id, q.content, q.ansa, q.ansb, q.ansc, q.ansd, q.ansright, q.image, q.mandatory
-    FROM result_details rd
-    JOIN questions q ON rd.question_id = q.id
-    WHERE rd.result_id = ?
-  ''', [resultId]);
-
-  // normalize null -> '' or 0
-  return rows.map((r) {
-    return {
-      'id': r['id'],
-      'question_id': r['question_id'],
-      'user_answer': (r['user_answer'] ?? '').toString(),
-      'is_correct': (r['is_correct'] ?? 0),
-      'content': (r['content'] ?? '').toString(),
-      'ansa': (r['ansa'] ?? '').toString(),
-      'ansb': (r['ansb'] ?? '').toString(),
-      'ansc': (r['ansc'] ?? '').toString(),
-      'ansd': (r['ansd'] ?? '').toString(),
-      'ansright': (r['ansright'] ?? '').toString(),
-      'image': r['image'],
-      'mandatory': (r['mandatory'] ?? 0),
-    };
-  }).toList();
-}
-
-
+  // Thêm kết quả thi
+  Future<int> insertResult(Map<String, dynamic> result) async {
+    final db = await database;
+    return await db.insert('results', result);
+  }
+  // Lấy danh sách kết quả bài thi của người dùng
+  Future<List<Map<String, dynamic>>> getResultsByUserId(int userId) async {
+    final db = await database; // Đảm bảo bạn đã khởi tạo database ở đây
+    return await db.query(
+      'results',
+      where: 'user_id = ?',
+      whereArgs: [userId],
+      orderBy: 'taken_at DESC', // Sắp xếp theo thời gian mới nhất
+    );
+  }
 }

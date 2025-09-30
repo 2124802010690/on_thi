@@ -37,6 +37,7 @@ dependencies:
   provider: ^6.0.5       # state management (tuỳ chọn)
   shared_preferences: ^2.1.1
   image_picker: ^1.0.7
+  http: ^1.5.0
 
 
 dev_dependencies:

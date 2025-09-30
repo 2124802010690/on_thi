@@ -2,9 +2,9 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:path/path.dart';
+import 'package:image_picker/image_picker.dart'; // Thêm thư viện image_picker
+import 'package:path_provider/path_provider.dart'; // Thêm thư viện path_provider
+import 'package:path/path.dart'; // Thêm thư viện path
 
 import 'login_screen.dart';
 import 'update_info_screen.dart';
@@ -43,19 +43,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
     await prefs.setString('user', jsonEncode(updatedUser));
   }
 
+  // Hàm mới để chọn ảnh và cập nhật avatar
   Future<void> _pickImage() async {
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(source: ImageSource.gallery);
 
     if (pickedFile != null) {
+      // Lấy thư mục lưu trữ cục bộ của ứng dụng
       final appDir = await getApplicationDocumentsDirectory();
+      // Tạo một tên file duy nhất để tránh trùng lặp
       final fileName = basename(pickedFile.path);
       final savedImage = await File(pickedFile.path).copy('${appDir.path}/$fileName');
 
+      // Cập nhật đường dẫn ảnh mới vào dữ liệu người dùng
       setState(() {
         user['avatar'] = savedImage.path;
       });
 
+      // Lưu dữ liệu người dùng đã cập nhật vào SharedPreferences
       await _saveUser(user);
     }
   }
@@ -86,13 +91,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   GestureDetector(
-                    onTap: _pickImage,
+                    onTap: _pickImage, // Gán hàm _pickImage cho sự kiện chạm
                     child: CircleAvatar(
                       radius: 50,
                       backgroundImage:
                           (user['avatar'] != null && File(user['avatar']).existsSync())
                               ? FileImage(File(user['avatar']))
-: const AssetImage("assets/images/avatar.png") as ImageProvider,
+                              : const AssetImage("assets/images/avatar.png") as ImageProvider,
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -114,13 +119,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ),
                   const SizedBox(height: 20),
-                  const Divider(),
+                    const Divider(),
                   _buildInfoRow(Icons.phone, "Số điện thoại", user['phone'] ?? "Chưa có"),
                   _buildInfoRow(Icons.badge, "Mã học viên", user['id']?.toString() ?? "Chưa có"),
                   _buildInfoRow(Icons.location_on, "Địa chỉ", user['address']?.toString() ?? "Chưa có"),
                   const SizedBox(height: 30),
                   _buildActionButtons(context),
                   const SizedBox(height: 30),
+
                   ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.red,
@@ -170,7 +176,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
-_buildActionButton(
+        _buildActionButton(
           icon: Icons.edit,
           label: "Cập nhật",
           onPressed: () async {
