@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import '../models/user_model.dart';
 
 class UpdateInfoScreen extends StatefulWidget {
-  final Map<String, dynamic> user;
+  final UserModel user;
   const UpdateInfoScreen({super.key, required this.user});
 
   @override
@@ -17,9 +18,9 @@ class _UpdateInfoScreenState extends State<UpdateInfoScreen> {
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController(text: widget.user['name'] ?? '');
-    _phoneController = TextEditingController(text: widget.user['phone'] ?? '');
-    _addressController = TextEditingController(text: widget.user['address'] ?? '');
+    _nameController = TextEditingController(text: widget.user.name);
+    _phoneController = TextEditingController(text: widget.user.phone ?? '');
+    _addressController = TextEditingController(text: widget.user.address ?? '');
   }
 
   @override
@@ -32,17 +33,21 @@ class _UpdateInfoScreenState extends State<UpdateInfoScreen> {
 
   void _updateUser() {
     if (_formKey.currentState!.validate()) {
-      final updatedUser = {
-        'name': _nameController.text,
-        'phone': _phoneController.text,
-        'address': _addressController.text,
-      };
+      final updatedUser = UserModel(
+        id: widget.user.id,
+        name: _nameController.text,
+        email: widget.user.email,
+        password: widget.user.password,
+        avatar: widget.user.avatar,
+        phone: _phoneController.text,
+        address: _addressController.text,
+      );
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Thông tin đã được cập nhật.')),
       );
 
-      Navigator.pop(context, updatedUser);
+      Navigator.pop(context, updatedUser); // ✅ trả về UserModel
     }
   }
 

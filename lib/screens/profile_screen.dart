@@ -2,16 +2,17 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:image_picker/image_picker.dart'; // Thêm thư viện image_picker
-import 'package:path_provider/path_provider.dart'; // Thêm thư viện path_provider
-import 'package:path/path.dart'; // Thêm thư viện path
-
+import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart';
+import '../services/db_helper.dart';
+import '../models/user_model.dart';
 import 'login_screen.dart';
 import 'update_info_screen.dart';
 import 'change_password_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
-  final Map<String, dynamic> user;
+  final UserModel user;
   const ProfileScreen({super.key, required this.user});
 
   @override
@@ -19,62 +20,80 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  late Map<String, dynamic> user;
+  late UserModel _user;
 
   @override
   void initState() {
     super.initState();
-    user = Map<String, dynamic>.from(widget.user);
+    _user = widget.user;
     _loadUser();
   }
 
-  Future<void> _loadUser() async {
-    final prefs = await SharedPreferences.getInstance();
-    final userData = prefs.getString('user');
-    if (userData != null) {
+Future<void> _loadUser() async {
+  final prefs = await SharedPreferences.getInstance();
+  final userId = prefs.getInt('userId');
+
+  if (userId != null) {
+    final dbUser = await DBHelper().getUserById(userId);
+    if (dbUser != null) {
+      if (!mounted) return;
       setState(() {
-        user = jsonDecode(userData);
+        _user = dbUser;
       });
+      return;
     }
   }
 
-  Future<void> _saveUser(Map<String, dynamic> updatedUser) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('user', jsonEncode(updatedUser));
+  // fallback: nếu không có userId trong prefs (hoặc DB không trả về), dùng widget.user
+  if (!mounted) return;
+  setState(() {
+    _user = widget.user;
+  });
+}
+
+Future<void> _saveUser(UserModel updatedUser) async {
+  // Lưu trực tiếp vào SQLite DB
+  await DBHelper().updateUser(updatedUser);
+}
+
+Future<void> _pickImage() async {
+  final picker = ImagePicker();
+  final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+
+  if (pickedFile != null) {
+    final appDir = await getApplicationDocumentsDirectory();
+    final fileName = basename(pickedFile.path);
+    final savedImage =
+        await File(pickedFile.path).copy('${appDir.path}/$fileName');
+
+    // Tạo user mới dựa trên _user hiện có — giữ nguyên phone, address,...
+    final updated = UserModel(
+      id: _user.id,
+      name: _user.name,
+      email: _user.email,
+      password: _user.password,
+      phone: _user.phone,
+      address: _user.address,
+      avatar: savedImage.path,
+    );
+
+    // Update state và DB
+    if (!mounted) return;
+    setState(() {
+      _user = updated;
+    });
+
+    await DBHelper().updateUser(updated);
   }
-
-  // Hàm mới để chọn ảnh và cập nhật avatar
-  Future<void> _pickImage() async {
-    final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
-
-    if (pickedFile != null) {
-      // Lấy thư mục lưu trữ cục bộ của ứng dụng
-      final appDir = await getApplicationDocumentsDirectory();
-      // Tạo một tên file duy nhất để tránh trùng lặp
-      final fileName = basename(pickedFile.path);
-      final savedImage = await File(pickedFile.path).copy('${appDir.path}/$fileName');
-
-      // Cập nhật đường dẫn ảnh mới vào dữ liệu người dùng
-      setState(() {
-        user['avatar'] = savedImage.path;
-      });
-
-      // Lưu dữ liệu người dùng đã cập nhật vào SharedPreferences
-      await _saveUser(user);
-    }
-  }
+}
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0D47A1),
+      backgroundColor: const Color(0xFF003366),
       appBar: AppBar(
-        title: const Text(
-          "Thông tin cá nhân",
-          style: TextStyle(color: Colors.white),
-        ),
-        backgroundColor: const Color(0xFF0D47A1),
+        title: const Text("Thông tin cá nhân", style: TextStyle(color: Colors.white)),
+        backgroundColor: const Color(0xFF003366),
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: Center(
@@ -82,27 +101,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
           padding: const EdgeInsets.all(24.0),
           child: Card(
             elevation: 8,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
             child: Padding(
               padding: const EdgeInsets.all(24.0),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   GestureDetector(
-                    onTap: _pickImage, // Gán hàm _pickImage cho sự kiện chạm
+                    onTap: _pickImage,
                     child: CircleAvatar(
                       radius: 50,
-                      backgroundImage:
-                          (user['avatar'] != null && File(user['avatar']).existsSync())
-                              ? FileImage(File(user['avatar']))
-                              : const AssetImage("assets/images/avatar.png") as ImageProvider,
+                      backgroundImage: (_user.avatar != null && File(_user.avatar!).existsSync())
+                          ? FileImage(File(_user.avatar!))
+                          : const AssetImage("assets/images/avatar.png") as ImageProvider,
                     ),
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    user['name'] ?? "Học viên",
+                    _user.name.isNotEmpty ? _user.name : "Học viên",
                     style: const TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
@@ -110,45 +126,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  if (user['email'] != null)
-                    Text(
-                      user['email'],
-                      style: const TextStyle(
-                        fontSize: 16,
-                        color: Colors.black54,
-                      ),
-                    ),
+                  Text(
+                    _user.email,
+                    style: const TextStyle(fontSize: 16, color: Colors.black54),
+                  ),
                   const SizedBox(height: 20),
-                    const Divider(),
-                  _buildInfoRow(Icons.phone, "Số điện thoại", user['phone'] ?? "Chưa có"),
-                  _buildInfoRow(Icons.badge, "Mã học viên", user['id']?.toString() ?? "Chưa có"),
-                  _buildInfoRow(Icons.location_on, "Địa chỉ", user['address']?.toString() ?? "Chưa có"),
-                  const SizedBox(height: 30),
+                  const Divider(),
+                  _buildInfoRow(Icons.badge, "Mã học viên", _user.id?.toString() ?? "Chưa có"),
+                  // ✅ Số điện thoại
+                  _buildInfoRow(Icons.phone, "Số điện thoại", _user.phone ?? "Chưa có"),
+
+                  // ✅ Địa chỉ
+                  _buildInfoRow(Icons.home, "Địa chỉ", _user.address ?? "Chưa có"),
+                                    const SizedBox(height: 30),
                   _buildActionButtons(context),
                   const SizedBox(height: 30),
-
                   ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.red,
                       padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                     onPressed: () {
                       _logout();
                       Navigator.of(context).pushAndRemoveUntil(
-                        MaterialPageRoute(
-                          builder: (context) => const LoginScreen(),
-                        ),
+                        MaterialPageRoute(builder: (context) => const LoginScreen()),
                         (Route<dynamic> route) => false,
                       );
+
                     },
                     icon: const Icon(Icons.logout, color: Colors.white),
-                    label: const Text(
-                      "Đăng xuất",
-                      style: TextStyle(fontSize: 16, color: Colors.white),
-                    ),
+                    label: const Text("Đăng xuất", style: TextStyle(fontSize: 16, color: Colors.white)),
                   ),
                 ],
               ),
@@ -159,10 +167,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Future<void> _logout() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('user');
-  }
+Future<void> _logout() async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.remove('userId');
+}
+
 
   Widget _buildInfoRow(IconData icon, String title, String value) {
     return ListTile(
@@ -180,20 +189,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
           icon: Icons.edit,
           label: "Cập nhật",
           onPressed: () async {
-            final updatedUser = await Navigator.push(
+            final updatedUser = await Navigator.push<UserModel?>(
               context,
               MaterialPageRoute(
-                builder: (context) => UpdateInfoScreen(user: user),
+                builder: (context) => UpdateInfoScreen(user: _user),
               ),
             );
             if (updatedUser != null) {
               setState(() {
-                user = {
-                  ...user,
-                  ...updatedUser,
-                };
+                _user = updatedUser;
               });
-              _saveUser(user);
+              _saveUser(_user);
             }
           },
         ),
@@ -204,9 +210,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => ChangePasswordScreen(
-                  userId: user['id'],
-                ),
+                builder: (context) => ChangePasswordScreen(userId: _user.id!),
               ),
             );
           },
@@ -235,11 +239,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ),
         const SizedBox(height: 8),
-        Text(
-          label,
-          style: const TextStyle(fontSize: 12, color: Colors.black54),
-          textAlign: TextAlign.center,
-        ),
+        Text(label, style: const TextStyle(fontSize: 12, color: Colors.black54)),
       ],
     );
   }

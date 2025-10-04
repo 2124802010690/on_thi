@@ -20,24 +20,25 @@ class _TopicListScreenState extends State<TopicListScreen> {
     _loadTopics();
   }
 
-  Future<void> _loadTopics() async {
-    final rawTopics = await DBHelper().getTopics();
-    setState(() {
-      _topics = rawTopics.map((map) => Topic.fromMap(map)).toList();
-      _isLoading = false;
-    });
-  }
+Future<void> _loadTopics() async {
+  final topics = await DBHelper().getTopics(); // ✅ List<Topic>
+  setState(() {
+    _topics = topics;
+    _isLoading = false;
+  });
+}
+
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0D47A1),
+      backgroundColor: const Color(0xFF003366),
       appBar: AppBar(
         title: const Text(
           'Học lý thuyết',
           style: TextStyle(color: Colors.white),
         ),
-        backgroundColor: const Color(0xFF0D47A1),
+        backgroundColor: const Color(0xFF003366),
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: Center(
@@ -83,9 +84,7 @@ class _TopicListScreenState extends State<TopicListScreen> {
                                         context,
                                         MaterialPageRoute(
                                           builder: (context) => TheoryScreen(
-                                            topicId: topic.id,
-                                            topicTitle: topic.title,
-                                          ),
+topic: topic        ),
                                         ),
                                       );
                                     },

@@ -141,7 +141,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       return;
     }
 
-    final currentPassInDb = user['password'];
+    final currentPassInDb = user.password;
 
     if (currentPassInDb != oldPass) {
       setState(() {

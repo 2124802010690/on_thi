@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/db_helper.dart';
+import '../models/user_model.dart';
 
 enum AlphaOption { both, lowercase, uppercase }
 enum NonAlphaOption { both, numbers, symbols }
@@ -23,15 +24,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
   String _message = '';
   bool _isSuccess = false;
 
-  double _passwordStrength = 0.0; // 0-1
+  double _passwordStrength = 0.0;
   String _passwordStrengthLabel = "Very Weak";
 
-  // Toggle hiện/ẩn mật khẩu
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
 
-  // Generator options (mặc định)
-  int _genLength = 12; // 10 - 18 theo yêu cầu
+  // Password generator options
+  int _genLength = 12;
   AlphaOption _alphaOption = AlphaOption.both;
   NonAlphaOption _nonAlphaOption = NonAlphaOption.both;
 
@@ -45,12 +45,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   void dispose() {
     _usernameController.dispose();
+    _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
   }
 
-  /// Sinh mật khẩu theo tuỳ chọn
+  /// Tạo mật khẩu ngẫu nhiên
   String _generatePassword({
     int length = 12,
     AlphaOption alpha = AlphaOption.both,
@@ -62,12 +63,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
     const symbols = '!@#\$%^&*()_-+=<>?';
 
     String pool = '';
-
     if (alpha == AlphaOption.both) {
       pool += lower + upper;
     } else if (alpha == AlphaOption.lowercase) {
       pool += lower;
-    } else if (alpha == AlphaOption.uppercase) {
+    } else {
       pool += upper;
     }
 
@@ -75,20 +75,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
       pool += numbers + symbols;
     } else if (nonAlpha == NonAlphaOption.numbers) {
       pool += numbers;
-    } else if (nonAlpha == NonAlphaOption.symbols) {
+    } else {
       pool += symbols;
     }
 
-    if (pool.isEmpty) {
-      pool = lower + numbers;
-    }
+    if (pool.isEmpty) pool = lower + numbers;
 
     final rand = Random.secure();
     return List.generate(length, (index) => pool[rand.nextInt(pool.length)])
         .join();
   }
 
-  /// Tính độ mạnh mật khẩu
+  /// Đánh giá độ mạnh mật khẩu
   void _checkPasswordStrength(String password) {
     double strength = 0;
 
@@ -118,79 +116,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _passwordStrength = strength;
     });
   }
-  
 
-  void _register() async {
-    if (_formKey.currentState == null) return;
-    if (!_formKey.currentState!.validate()) return;
-
-    final username = _usernameController.text.trim();
-    final email = _emailController.text.trim();
-    final password = _passwordController.text;
-    final confirm = _confirmPasswordController.text;
-
-    if (password != confirm) {
-      setState(() {
-        _message = 'Mật khẩu xác nhận không khớp';
-        _isSuccess = false;
-      });
-      return;
-    }
-
-    // Gọi DBHelper đã cập nhật (phải truyền email)
-    final result = await DBHelper().registerUser(username, email, password);
-
-    if (!mounted) return;
-
-    if (result == -1) {
-      setState(() {
-        _message = 'Email đã tồn tại! Vui lòng dùng email khác.';
-        _isSuccess = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Email đã tồn tại, vui lòng chọn email khác")),
-      );
-    } else {
-      setState(() {
-        _message = 'Đăng ký thành công!';
-        _isSuccess = true;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Đăng ký thành công, quay lại đăng nhập")),
-      );
-
-      // Sau 1s quay lại login
-      Future.delayed(const Duration(seconds: 1), () {
-        if (mounted) Navigator.pop(context);
-      });
-    }
-  }
-
-  /// Custom radio option
-  Widget _buildRadioOption<T>({
-    required String label,
-    required T value,
-    required T groupValue,
-    required Function(T?) onChanged,
-  }) {
-    return Expanded(
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Radio<T>(
-            value: value,
-            groupValue: groupValue,
-            onChanged: onChanged,
-          ),
-          Flexible(
-            child: Text(label, overflow: TextOverflow.ellipsis),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Mở modal generator
+  /// Bottom sheet chỉnh option generator
   void _openGeneratorDialog() {
     showModalBottomSheet(
       context: context,
@@ -257,7 +184,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                     ],
                   ),
-
                   const SizedBox(height: 8),
                   const Text('Non Alpha Characters:'),
                   Column(
@@ -282,9 +208,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                     ],
                   ),
-                                  
                   const SizedBox(height: 20),
-
                   ElevatedButton(
                     onPressed: () {
                       setState(() {
@@ -292,19 +216,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         _alphaOption = tmpAlpha;
                         _nonAlphaOption = tmpNonAlpha;
                       });
-
                       String newPass = _generatePassword(
-                          length: _genLength,
-                          alpha: _alphaOption,
-                          nonAlpha: _nonAlphaOption);
-
+                        length: _genLength,
+                        alpha: _alphaOption,
+                        nonAlpha: _nonAlphaOption,
+                      );
                       _passwordController.text = newPass;
                       _confirmPasswordController.text = newPass;
                       _checkPasswordStrength(newPass);
                       Clipboard.setData(ClipboardData(text: newPass));
-
                       Navigator.of(context).pop();
-
                     },
                     style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF003366)),
@@ -318,6 +239,54 @@ class _RegisterScreenState extends State<RegisterScreen> {
         );
       },
     );
+  }
+
+  /// Đăng ký
+  Future<void> _register() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    final username = _usernameController.text.trim();
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    final confirm = _confirmPasswordController.text;
+
+    if (password != confirm) {
+      setState(() {
+        _message = 'Mật khẩu xác nhận không khớp';
+        _isSuccess = false;
+      });
+      return;
+    }
+
+    final user = UserModel(
+      name: username,
+      email: email,
+      password: password,
+    );
+
+    final result = await DBHelper().registerUser(user);
+
+    if (!mounted) return;
+
+    if (result == -1) {
+      setState(() {
+        _message = 'Email đã tồn tại! Vui lòng dùng email khác.';
+        _isSuccess = false;
+      });
+    } else {
+      setState(() {
+        _message = 'Đăng ký thành công!';
+        _isSuccess = true;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Đăng ký thành công, quay lại đăng nhập")),
+      );
+
+      Future.delayed(const Duration(seconds: 1), () {
+        if (mounted) Navigator.pop(context);
+      });
+    }
   }
 
   Widget _buildTextField(TextEditingController controller, String hintText,
@@ -365,8 +334,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             right: 0,
             child: Column(
               children: const [
-                Icon(Icons.directions_car,
-                    color: Colors.white, size: 80),
+                Icon(Icons.directions_car, color: Colors.white, size: 80),
                 SizedBox(height: 10),
                 Text(
                   'GPLX Hạng B',
@@ -413,94 +381,61 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       key: _formKey,
                       child: Column(
                         children: [
-                          // Tên đăng nhập
                           _buildTextField(
                             _usernameController,
                             'Tên đăng nhập',
                             Icons.person,
                           ),
                           const SizedBox(height: 20),
-
-                          // Email
-                          Container(
-                            decoration: BoxDecoration(
-                              color: Colors.grey[200],
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: TextFormField(
-                              controller: _emailController,
-                              keyboardType: TextInputType.emailAddress,
-                              decoration: const InputDecoration(
-                                prefixIcon: Icon(Icons.email, color: Colors.grey),
-                                hintText: 'Email',
-                                border: InputBorder.none,
-                                contentPadding: EdgeInsets.symmetric(vertical: 15, horizontal: 10),
-                              ),
-                              validator: (value) {
-                                if (value == null || value.trim().isEmpty) {
-                                  return 'Vui lòng nhập Email';
-                                }
-                                final email = value.trim();
-                                final emailRegex =
-                                    RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
-                                if (!emailRegex.hasMatch(email)) {
-                                  return 'Email không hợp lệ';
-                                }
-                                return null;
-                              },
-                            ),
+                          _buildTextField(
+                            _emailController,
+                            'Email',
+                            Icons.email,
                           ),
                           const SizedBox(height: 20),
-
-                          // Mật khẩu
-                          TextFormField(
-                            controller: _passwordController,
+                          _buildTextField(
+                            _passwordController,
+                            'Mật khẩu',
+                            Icons.lock,
                             obscureText: _obscurePassword,
-                            decoration: InputDecoration(
-                              prefixIcon: const Icon(Icons.lock),
-                              hintText: 'Mật khẩu',
-                              border: InputBorder.none,
-                              filled: true,
-                              fillColor: Colors.grey[200],
-                              suffixIcon: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  IconButton(
-                                    icon: Icon(
-                                      _obscurePassword
-                                          ? Icons.visibility_off
-                                          : Icons.visibility,
-                                    ),
-                                    onPressed: () {
-                                      setState(() {
-                                        _obscurePassword = !_obscurePassword;
-                                      });
-                                    },
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.refresh),
-                                    onPressed: () {
-                                      String newPass = _generatePassword(
-                                        length: _genLength,
-                                        alpha: _alphaOption,
-                                        nonAlpha: _nonAlphaOption,
-                                      );
+                            suffixIcon: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: Icon(_obscurePassword
+                                      ? Icons.visibility_off
+                                      : Icons.visibility),
+                                  onPressed: () {
+                                    setState(() {
+                                      _obscurePassword = !_obscurePassword;
+                                    });
+                                  },
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.refresh),
+                                  onPressed: () {
+                                    // Sinh mật khẩu mới ngay lập tức
+                                    String newPass = _generatePassword(
+                                      length: _genLength,
+                                      alpha: _alphaOption,
+                                      nonAlpha: _nonAlphaOption,
+                                    );
+                                    setState(() {
                                       _passwordController.text = newPass;
                                       _confirmPasswordController.text = newPass;
                                       _checkPasswordStrength(newPass);
-                                      Clipboard.setData(ClipboardData(text: newPass));
+                                    });
+                                    Clipboard.setData(ClipboardData(text: newPass));
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text("Mật khẩu mới đã được tạo & copy")),
+                                    );
+                                  },
+                                ),
 
-                                    },
-                                  ),
-                                ],
-                              ),
+                              ],
                             ),
-                            onChanged: (value) => _checkPasswordStrength(value),
-                            validator: (value) =>
-                                value!.isEmpty ? 'Vui lòng nhập mật khẩu' : null,
                           ),
-
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 10),
                           LinearProgressIndicator(
                             value: _passwordStrength,
                             backgroundColor: Colors.grey[300],
@@ -512,53 +447,71 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             minHeight: 6,
                           ),
                           const SizedBox(height: 4),
-                          Row(
+                          Text(
+                            "Strength: $_passwordStrengthLabel",
+                            style: TextStyle(
+                              color: _passwordStrength >= 0.75
+                                  ? Colors.green
+                                  : _passwordStrength >= 0.5
+                                      ? Colors.orange
+                                      : Colors.red,
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                                                    Row(
                             children: [
                               Expanded(
-                                child: Text(
-                                  "Strength: $_passwordStrengthLabel",
-                                  style: TextStyle(
-                                    color: _passwordStrength >= 0.75
-                                        ? Colors.green
-                                        : _passwordStrength >= 0.5
-                                            ? Colors.orange
-                                            : Colors.red,
+                                child: ElevatedButton.icon(
+                                  onPressed: _openGeneratorDialog,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.blueGrey,
+                                    minimumSize: const Size(double.infinity, 45),
                                   ),
+                                  icon: const Icon(Icons.password),
+                                  label: const Text("Password Generator"),
                                 ),
                               ),
                               const SizedBox(width: 10),
-                              ElevatedButton(
-                                onPressed: _openGeneratorDialog,
+                              ElevatedButton.icon(
+                                onPressed: () {
+                                  if (_passwordController.text.isNotEmpty) {
+                                    Clipboard.setData(
+                                      ClipboardData(text: _passwordController.text),
+                                    );
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text("Mật khẩu đã được copy"),
+                                      ),
+                                    );
+                                  }
+                                },
                                 style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF003366)),
-                                child: const Text('Password Generator'),
-                              )
+                                  backgroundColor: Colors.green,
+                                  minimumSize: const Size(45, 45),
+                                ),
+                                icon: const Icon(Icons.copy, size: 20),
+                                label: const Text("Copy"),
+                              ),
                             ],
                           ),
-                          const SizedBox(height: 20),
-
-                          // Xác nhận mật khẩu
                           _buildTextField(
                             _confirmPasswordController,
                             'Xác nhận mật khẩu',
                             Icons.lock,
                             obscureText: _obscureConfirmPassword,
                             suffixIcon: IconButton(
-                              icon: Icon(
-                                _obscureConfirmPassword
-                                    ? Icons.visibility_off
-                                    : Icons.visibility,
-                              ),
+                              icon: Icon(_obscureConfirmPassword
+                                  ? Icons.visibility_off
+                                  : Icons.visibility),
                               onPressed: () {
                                 setState(() {
-                                  _obscureConfirmPassword = !_obscureConfirmPassword;
+                                  _obscureConfirmPassword =
+                                      !_obscureConfirmPassword;
                                 });
                               },
                             ),
                           ),
                           const SizedBox(height: 20),
-
-                          // Nút đăng ký
                           ElevatedButton(
                             onPressed: _register,
                             style: ElevatedButton.styleFrom(
@@ -571,16 +524,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             ),
                           ),
                           const SizedBox(height: 12),
-
-                          // Chuyển sang màn đăng nhập
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               const Text("Đã có tài khoản? "),
                               TextButton(
-                                onPressed: () {
-                                  Navigator.pop(context);
-                                },
+                                onPressed: () => Navigator.pop(context),
                                 child: const Text(
                                   "Đăng nhập",
                                   style: TextStyle(color: Color(0xFF003366)),
@@ -588,18 +537,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               ),
                             ],
                           ),
+                          if (_message.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: Text(
+                                _message,
+                                style: TextStyle(
+                                    color: _isSuccess
+                                        ? Colors.green
+                                        : Colors.red),
+                                textAlign: TextAlign.center,
+                              ),
+                            )
                         ],
                       ),
                     ),
-
-                    const SizedBox(height: 12),
-                    if (_message.isNotEmpty)
-                      Text(_message,
-                          style: TextStyle(
-                              color: _isSuccess
-                                  ? Colors.green
-                                  : Colors.red),
-                          textAlign: TextAlign.center)
                   ],
                 ),
               ),

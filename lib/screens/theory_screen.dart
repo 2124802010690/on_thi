@@ -1,16 +1,14 @@
-// lib/screens/theory_screen.dart
 import 'package:flutter/material.dart';
 import '../models/question.dart';
+import '../models/topic.dart';
 import '../services/db_helper.dart';
 
 class TheoryScreen extends StatefulWidget {
-  final int topicId;
-  final String topicTitle;
+  final Topic topic; // ✅ Truyền luôn TopicModel thay vì id + title
 
   const TheoryScreen({
     super.key,
-    required this.topicId,
-    required this.topicTitle,
+    required this.topic,
   });
 
   @override
@@ -20,8 +18,8 @@ class TheoryScreen extends StatefulWidget {
 class _TheoryScreenState extends State<TheoryScreen> {
   List<Question> _questions = [];
   bool _isLoading = true;
-  int _currentIndex = 0; // Biến để theo dõi câu hỏi hiện tại
-  final Map<int, String> _selectedAnswers = {}; // Lưu trữ đáp án đã chọn
+  int _currentIndex = 0;
+  final Map<int, String> _selectedAnswers = {};
 
   @override
   void initState() {
@@ -31,9 +29,9 @@ class _TheoryScreenState extends State<TheoryScreen> {
 
   Future<void> _loadTheoryQuestions() async {
     try {
-      final rawQuestions = await DBHelper().getQuestionsByTopicId(widget.topicId);
+      final questions = await DBHelper().getQuestionsByTopicId(widget.topic.id); // ✅ DBHelper trả List<Question>
       setState(() {
-        _questions = rawQuestions.map((map) => Question.fromMap(map)).toList();
+        _questions = questions;
         _isLoading = false;
       });
     } catch (e) {
@@ -49,14 +47,12 @@ class _TheoryScreenState extends State<TheoryScreen> {
     }
   }
 
-  // Phương thức xử lý khi người dùng chọn một đáp án
   void _handleAnswerSelection(int questionIndex, String selectedOption) {
     setState(() {
       _selectedAnswers[questionIndex] = selectedOption;
     });
   }
 
-  // Widget hiển thị một lựa chọn đáp án
   Widget _buildAnswerOption(
     int questionIndex,
     String option,
@@ -82,9 +78,7 @@ class _TheoryScreenState extends State<TheoryScreen> {
     }
 
     return GestureDetector(
-      onTap: !isAnswered
-          ? () => _handleAnswerSelection(questionIndex, option)
-          : null,
+      onTap: !isAnswered ? () => _handleAnswerSelection(questionIndex, option) : null,
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 4),
         padding: const EdgeInsets.all(12),
@@ -125,49 +119,24 @@ class _TheoryScreenState extends State<TheoryScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return Scaffold(
-        backgroundColor: const Color(0xFF0D47A1),
-        appBar: AppBar(
-          title: const Text('Học lý thuyết', style: TextStyle(color: Colors.white)),
-          backgroundColor: const Color(0xFF0D47A1),
-          iconTheme: const IconThemeData(color: Colors.white),
-        ),
-        body: const Center(child: CircularProgressIndicator(color: Colors.white)),
-      );
+      return _loadingScaffold();
     }
 
     if (_questions.isEmpty) {
-      return Scaffold(
-        backgroundColor: const Color(0xFF0D47A1),
-        appBar: AppBar(
-          title: const Text('Học lý thuyết', style: TextStyle(color: Colors.white)),
-          backgroundColor: const Color(0xFF0D47A1),
-          iconTheme: const IconThemeData(color: Colors.white),
-        ),
-        body: const Center(
-          child: Padding(
-            padding: EdgeInsets.all(20.0),
-            child: Text(
-              'Không có câu hỏi nào trong chương này.',
-              style: TextStyle(color: Colors.white),
-              textAlign: TextAlign.center,
-            ),
-          ),
-        ),
-      );
+      return _emptyScaffold();
     }
 
     final currentQuestion = _questions[_currentIndex];
     final isLastQuestion = _currentIndex == _questions.length - 1;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0D47A1),
+      backgroundColor: const Color(0xFF003366),
       appBar: AppBar(
         title: Text(
-          widget.topicTitle,
+          widget.topic.title, // ✅ Dùng title từ TopicModel
           style: const TextStyle(color: Colors.white),
         ),
-        backgroundColor: const Color(0xFF0D47A1),
+        backgroundColor: const Color(0xFF003366),
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: Center(
@@ -197,53 +166,45 @@ class _TheoryScreenState extends State<TheoryScreen> {
                       ),
                     ),
                   const SizedBox(height: 14),
-                  
+
                   if (currentQuestion.ansa.isNotEmpty)
                     _buildAnswerOption(_currentIndex, 'A', currentQuestion.ansa, currentQuestion.ansright),
                   if (currentQuestion.ansb.isNotEmpty)
                     _buildAnswerOption(_currentIndex, 'B', currentQuestion.ansb, currentQuestion.ansright),
                   if (currentQuestion.ansc.isNotEmpty)
                     _buildAnswerOption(_currentIndex, 'C', currentQuestion.ansc, currentQuestion.ansright),
-                  if (currentQuestion.ansd != null && currentQuestion.ansd!.isNotEmpty)
-                    _buildAnswerOption(_currentIndex, 'D', currentQuestion.ansd!, currentQuestion.ansright),
-                  
-                  const SizedBox(height: 10),
-                  
+                  if (currentQuestion.ansd.isNotEmpty)
+                    _buildAnswerOption(_currentIndex, 'D', currentQuestion.ansd, currentQuestion.ansright),
+
                   const SizedBox(height: 20),
-                  
+
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      // Nút "Trước"
+                      // Nút Trước
                       Expanded(
                         child: Align(
                           alignment: Alignment.centerLeft,
                           child: TextButton(
                             onPressed: _currentIndex > 0
-                                ? () {
-                                    setState(() => _currentIndex--);
-                                  }
+                                ? () => setState(() => _currentIndex--)
                                 : null,
                             child: const Text('Trước'),
                           ),
                         ),
                       ),
-                      
-                      // Nút "Tiếp" hoặc "Quay lại"
+
+                      // Nút Tiếp hoặc Quay lại
                       Expanded(
                         child: Align(
                           alignment: Alignment.centerRight,
                           child: isLastQuestion
                               ? ElevatedButton(
-                                  onPressed: () {
-                                    Navigator.of(context).pop(); // Quay lại màn hình trước
-                                  },
+                                  onPressed: () => Navigator.of(context).pop(),
                                   child: const Text('Quay lại màn hình chính'),
                                 )
                               : ElevatedButton(
-                                  onPressed: () {
-                                    setState(() => _currentIndex++);
-                                  },
+                                  onPressed: () => setState(() => _currentIndex++),
                                   child: const Text('Tiếp'),
                                 ),
                         ),
@@ -258,4 +219,33 @@ class _TheoryScreenState extends State<TheoryScreen> {
       ),
     );
   }
+
+  Scaffold _loadingScaffold() => Scaffold(
+        backgroundColor: const Color(0xFF003366),
+        appBar: AppBar(
+          title: const Text('Học lý thuyết', style: TextStyle(color: Colors.white)),
+          backgroundColor: const Color(0xFF003366),
+          iconTheme: const IconThemeData(color: Colors.white),
+        ),
+        body: const Center(child: CircularProgressIndicator(color: Colors.white)),
+      );
+
+  Scaffold _emptyScaffold() => Scaffold(
+        backgroundColor: const Color(0xFF003366),
+        appBar: AppBar(
+          title: const Text('Học lý thuyết', style: TextStyle(color: Colors.white)),
+          backgroundColor: const Color(0xFF003366),
+          iconTheme: const IconThemeData(color: Colors.white),
+        ),
+        body: const Center(
+          child: Padding(
+            padding: EdgeInsets.all(20.0),
+            child: Text(
+              'Không có câu hỏi nào trong chương này.',
+              style: TextStyle(color: Colors.white),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+      );
 }

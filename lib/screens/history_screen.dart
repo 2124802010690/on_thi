@@ -1,17 +1,21 @@
 import 'package:flutter/material.dart';
 import '../services/db_helper.dart';
 import '../models/question.dart';
+import '../models/result_model.dart';
+import '../models/user_model.dart';
 import 'result_detail_screen.dart';
 
 class HistoryScreen extends StatefulWidget {
-  const HistoryScreen({super.key});
+  final UserModel user; // ✅ nhận user từ HomePage
+
+  const HistoryScreen({super.key, required this.user});
 
   @override
   State<HistoryScreen> createState() => _HistoryScreenState();
 }
 
 class _HistoryScreenState extends State<HistoryScreen> {
-  List<Map<String, dynamic>> _results = [];
+  List<ResultModel> _results = []; // ✅ chuẩn model
   List<Question> _allQuestions = [];
   bool _isLoading = true;
 
@@ -23,7 +27,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   Future<void> _loadData() async {
     final dbHelper = DBHelper();
-    final results = await dbHelper.getResultsByUserId(1);
+    final results = await dbHelper.getResultsByUserId(widget.user.id!); // List<ResultModel>
     final allQuestions = await dbHelper.getAllQuestions();
 
     setState(() {
@@ -46,9 +50,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // Nút quay về màn hình trước
                   IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28),
+                    icon: const Icon(Icons.arrow_back,
+                        color: Colors.white, size: 28),
                     onPressed: () {
                       Navigator.pop(context);
                     },
@@ -61,7 +65,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       color: Colors.white,
                     ),
                   ),
-                  const SizedBox(width: 40), // để cân đối layout
+                  const SizedBox(width: 40),
                 ],
               ),
             ),
@@ -93,12 +97,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             itemCount: _results.length,
                             itemBuilder: (context, index) {
                               final result = _results[index];
-                              final takenAt =
-                                  DateTime.parse(result['taken_at']);
+                              final takenAt = DateTime.parse(result.takenAt);
                               final resultText =
-                                  result['passed'] == 1 ? 'ĐẠT' : 'TRƯỢT';
+                                  result.passed == 1 ? 'ĐẠT' : 'TRƯỢT';
                               final resultColor =
-                                  result['passed'] == 1 ? Colors.green : Colors.red;
+                                  result.passed == 1 ? Colors.green : Colors.red;
 
                               return Card(
                                 shape: RoundedRectangleBorder(
@@ -110,9 +113,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                   contentPadding: const EdgeInsets.all(16),
                                   leading: CircleAvatar(
                                     radius: 25,
-                                    backgroundColor: resultColor.withOpacity(0.1),
+                                    backgroundColor:
+                                        resultColor.withOpacity(0.1),
                                     child: Icon(
-                                      result['passed'] == 1
+                                      result.passed == 1
                                           ? Icons.check_circle
                                           : Icons.cancel,
                                       color: resultColor,
@@ -122,11 +126,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                   title: Text(
                                     'Bài thi ngày ${takenAt.day}/${takenAt.month}/${takenAt.year}',
                                     style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16),
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                    ),
                                   ),
                                   subtitle: Text(
-                                    'Điểm: ${result['score']}/${result['total']}',
+                                    'Điểm: ${result.score}/${result.total}',
                                     style: const TextStyle(fontSize: 14),
                                   ),
                                   trailing: Text(
@@ -141,8 +146,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                     Navigator.push(
                                       context,
                                       MaterialPageRoute(
-                                        builder: (context) => ResultDetailScreen(
-                                          result: result,
+                                        builder: (context) =>
+                                            ResultDetailScreen(
+                                          result: result, // ✅ truyền ResultModel
                                           allQuestions: _allQuestions,
                                         ),
                                       ),

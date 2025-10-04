@@ -1,14 +1,21 @@
-// lib/screens/quiz_screen.dart
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../models/question.dart';
+import '../models/user_model.dart';
 import '../services/db_helper.dart';
 import 'result_screen.dart';
-import 'dart:convert';
+import '../models/result_model.dart';
 
 class QuizScreen extends StatefulWidget {
   final List<Question> questions;
-  const QuizScreen({super.key, required this.questions});
+  final UserModel user; // ✅ thêm user
+
+  const QuizScreen({
+    super.key,
+    required this.questions,
+    required this.user,
+  });
 
   @override
   State<QuizScreen> createState() => _QuizScreenState();
@@ -16,7 +23,7 @@ class QuizScreen extends StatefulWidget {
 
 class _QuizScreenState extends State<QuizScreen> {
   late Timer _timer;
-  Duration remaining = const Duration(minutes: 20);
+  Duration remaining = const Duration(minutes: 22);
   int currentIndex = 0;
   Map<int, String> answers = {};
   bool isGridVisible = true;
@@ -46,62 +53,69 @@ class _QuizScreenState extends State<QuizScreen> {
     });
   }
 
-  void finishExam({bool auto = false}) async {
-    // Ngừng bộ đếm thời gian
-    _timer.cancel();
+void finishExam({bool auto = false}) async {
+  _timer.cancel();
 
-    int correct = 0;
-    bool failedMandatory = false;
+  int correct = 0;
+  bool failedMandatory = false;
 
-    for (int i = 0; i < widget.questions.length; i++) {
-      final q = widget.questions[i];
-      final selected = answers[i];
-      if (selected != null && selected == q.ansright) {
-        correct++;
-      }
-      // Kiểm tra câu hỏi điểm liệt
-      if (q.mandatory && (selected == null || selected != q.ansright)) {
-        failedMandatory = true;
-      }
+  for (int i = 0; i < widget.questions.length; i++) {
+    final q = widget.questions[i];
+    final selected = answers[i];
+    if (selected != null && selected == q.ansright) {
+      correct++;
     }
-
-    final passed = (!failedMandatory) && (correct >= 28);
-    Map<String, String> stringAnswers = answers.map(
-      (key, value) => MapEntry(key.toString(), value),
-    );
-
-    // Lưu kết quả vào cơ sở dữ liệu
-    try {
-      await DBHelper().insertResult({
-        'user_id': 1, // Bạn có thể thay đổi user_id tùy theo logic ứng dụng
-        'score': correct,
-        'total': widget.questions.length,
-        'passed': passed ? 1 : 0,
-        'failed_due_mandatory': failedMandatory ? 1 : 0,
-        'taken_at': DateTime.now().toIso8601String(),
-        'answers': json.encode(stringAnswers),
-      });
-    } catch (e) {
-      debugPrint('Lỗi khi lưu kết quả: $e');
+    // Kiểm tra câu hỏi điểm liệt
+    if (q.mandatory && (selected == null || selected != q.ansright)) {
+      failedMandatory = true;
     }
-
-    if (!mounted) {
-      return;
-    }
-
-    // Điều hướng sang màn hình kết quả và thay thế màn hình hiện tại
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (_) => ResultScreen(
-          questions: widget.questions,
-          answers: answers,
-          isPassed: passed,
-          correctCount: correct,
-        ),
-      ),
-    );
   }
+
+  final passed = (!failedMandatory) && (correct >= 28);
+
+  // Lưu đáp án dưới dạng JSON (key = index câu, value = lựa chọn)
+  final stringAnswers = json.encode(
+    answers.map((key, value) => MapEntry(key.toString(), value)),
+  );
+
+  // Lưu danh sách ID các câu hỏi trong bài thi
+  final questionIds = widget.questions.map((q) => q.id).join(',');
+
+  // Tạo ResultModel
+  final result = ResultModel(
+    userId: widget.user.id!,
+    score: correct,
+    total: widget.questions.length,
+    passed: passed,
+    failedDueMandatory: failedMandatory,
+    takenAt: DateTime.now().toIso8601String(),
+    answers: stringAnswers,
+    questionIds: questionIds,
+  );
+
+  // Lưu vào DB
+  try {
+    await DBHelper().insertResult(result);
+  } catch (e) {
+    debugPrint('Lỗi khi lưu kết quả: $e');
+  }
+
+  if (!mounted) return;
+
+  // Chuyển sang màn hình kết quả
+  Navigator.pushReplacement(
+    context,
+    MaterialPageRoute(
+      builder: (_) => ResultScreen(
+        questions: widget.questions,
+        answers: answers,
+        isPassed: passed,
+        correctCount: correct,
+      ),
+    ),
+  );
+}
+
 
   @override
   void dispose() {
@@ -157,7 +171,7 @@ class _QuizScreenState extends State<QuizScreen> {
     final seconds = (remaining.inSeconds % 60).toString().padLeft(2, '0');
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0D47A1), // nền xanh giống login
+      backgroundColor: const Color(0xFF0D47A1),
       appBar: AppBar(
         toolbarHeight: 40,
         title: const Text(
@@ -169,7 +183,7 @@ class _QuizScreenState extends State<QuizScreen> {
         actions: [
           TextButton(
             onPressed: () {
-              finishExam(); // Bấm "Nộp bài" trên AppBar sẽ kết thúc bài thi
+              finishExam();
             },
             child: const Text(
               'Nộp bài',
@@ -192,6 +206,7 @@ class _QuizScreenState extends State<QuizScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Header
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     decoration: BoxDecoration(
@@ -213,6 +228,8 @@ class _QuizScreenState extends State<QuizScreen> {
                     ),
                   ),
                   const SizedBox(height: 14),
+
+                  // Danh sách câu hỏi
                   Container(
                     decoration: BoxDecoration(
                       color: Colors.grey[100],
@@ -289,7 +306,8 @@ class _QuizScreenState extends State<QuizScreen> {
                     ),
                   ),
                   const SizedBox(height: 10),
-                  // Hiển thị nội dung câu hỏi và hình ảnh (nếu có)
+
+                  // Nội dung câu hỏi
                   Text(q.content, style: const TextStyle(fontSize: 15)),
                   if (q.image != null && q.image!.isNotEmpty)
                     Padding(
@@ -297,12 +315,15 @@ class _QuizScreenState extends State<QuizScreen> {
                       child: Image.asset(q.image!),
                     ),
                   const SizedBox(height: 14),
-                  // Hiển thị các lựa chọn trả lời
+
+                  // Các lựa chọn
                   if (q.ansa.isNotEmpty) choiceButton(currentIndex, 'A', q.ansa),
                   if (q.ansb.isNotEmpty) choiceButton(currentIndex, 'B', q.ansb),
                   if (q.ansc.isNotEmpty) choiceButton(currentIndex, 'C', q.ansc),
                   if (q.ansd.isNotEmpty) choiceButton(currentIndex, 'D', q.ansd),
                   const SizedBox(height: 10),
+
+                  // Navigation buttons
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -319,7 +340,6 @@ class _QuizScreenState extends State<QuizScreen> {
                           if (currentIndex < widget.questions.length - 1) {
                             setState(() => currentIndex++);
                           } else {
-                            // Nút "Tiếp" chuyển thành "Nộp bài" ở câu hỏi cuối cùng
                             finishExam();
                           }
                         },

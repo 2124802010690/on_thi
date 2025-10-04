@@ -5,7 +5,34 @@ class GeminiService {
   final String apiKey = "AIzaSyDpZYnoKNJONB3CdmYdZyVxaDFwrM4LcYM";
   final String model = "gemini-2.5-flash"; 
 
+  // Danh sách các từ khóa bị cấm (Blacklist)
+  final List<String> _blacklist = [
+    'chính trị', 
+    'bạo lực', 
+    'tài chính', 
+    'tuyệt mật',
+    // Thêm các từ khóa khác nếu cần
+  ];
+
+  // Hàm kiểm tra từ khóa bị cấm
+  String? _checkBlacklist(String message) {
+    final lowerCaseMessage = message.toLowerCase();
+    for (var keyword in _blacklist) {
+      if (lowerCaseMessage.contains(keyword)) {
+        return "Nội dung của bạn chứa từ khóa bị cấm: '$keyword'. Vui lòng sửa lại.";
+      }
+    }
+    return null; // Trả về null nếu không có từ khóa nào bị cấm
+  }
+
   Future<String> sendMessage(String message) async {
+    // ⚠️ BƯỚC 1: KIỂM TRA BLACKLIST
+    final blacklistError = _checkBlacklist(message);
+    if (blacklistError != null) {
+      return blacklistError; // Trả về thông báo lỗi nếu bị cấm
+    }
+    // ------------------------------------
+    
     final url = Uri.parse(
       "https://generativelanguage.googleapis.com/v1/models/$model:generateContent?key=$apiKey",
     );
@@ -21,14 +48,12 @@ class GeminiService {
             ]
           }
         ],
-        // ✅ ĐÃ SỬA: Đổi tên trường từ "config" thành "generationConfig"
-        "generationConfig": { // <-- ĐÂY LÀ TÊN CHÍNH XÁC MÀ API CẦN
+        "generationConfig": { 
           "temperature": 0.7
         }
       }),
     );
 
-    // ... (Phần xử lý response status code 200/else giữ nguyên)
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       final candidates = data["candidates"] as List?;

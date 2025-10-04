@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../services/db_helper.dart';
 import 'home_page.dart';
 import 'register_screen.dart';
+import '../models/user_model.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -14,55 +15,39 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  // Đã sửa từ usernameController thành emailController
-  final _emailController = TextEditingController(); 
+  final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   String _error = '';
 
-  void _login() async {
-    if (_formKey.currentState!.validate()) {
-      final user = await DBHelper().loginUser(
-        // Gọi hàm loginUser với email và password
-        _emailController.text.trim(), 
-        _passwordController.text,
-      );
+void _login() async {
+  if (!_formKey.currentState!.validate()) return;
 
-      if (!mounted) return;
+  final user = await DBHelper().loginUser(
+    _emailController.text.trim(),
+    _passwordController.text.trim(),
+  );
 
-      if (user != null) {
-        final prefs = await SharedPreferences.getInstance();
-        final userData = prefs.getString('user');
-        
-        // Tạo một biến để chứa dữ liệu cuối cùng
-        Map<String, dynamic> finalUser = user;
+  if (!mounted) return;
 
-        if (userData != null) {
-          final savedUser = Map<String, dynamic>.from(jsonDecode(userData));
-          
-          // Hợp nhất dữ liệu: dữ liệu từ DB (user) sẽ được ưu tiên,
-          // sau đó các trường đã được cập nhật từ SharedPreferences (savedUser)
-          // sẽ ghi đè lên để giữ lại thông tin mới nhất.
-          finalUser = {
-            ...user, // Dữ liệu từ cơ sở dữ liệu
-            ...savedUser, // Dữ liệu đã cập nhật từ SharedPreferences
-          };
-        }
-        
-        // Lưu lại finalUser đã hợp nhất vào SharedPreferences
-        await prefs.setString('user', jsonEncode(finalUser));
-        
-        // Chuyển đến màn hình chính với dữ liệu đã được cập nhật
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => HomePage(user: finalUser)),
-        );
-      } else {
-        setState(() {
-          _error = 'Tên đăng nhập hoặc mật khẩu không đúng';
-        });
-      }
-    }
+  if (user != null) {
+    final prefs = await SharedPreferences.getInstance();
+    // ✅ Lưu userId (chỉ lưu id)
+    await prefs.setInt('userId', user.id!);
+
+    // Chuyển tiếp: vẫn có thể truyền user cho HomePage để hiển thị nhanh,
+    // nhưng Profile sẽ luôn re-load từ DB khi cần.
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => HomePage(user: user),
+      ),
+    );
+  } else {
+    setState(() {
+      _error = 'Tên đăng nhập hoặc mật khẩu không đúng';
+    });
   }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -75,14 +60,10 @@ class _LoginScreenState extends State<LoginScreen> {
             left: 0,
             right: 0,
             child: Column(
-              children: [
-                const Icon(
-                  Icons.directions_car,
-                  color: Colors.white,
-                  size: 80,
-                ),
-                const SizedBox(height: 10),
-                const Text(
+              children: const [
+                Icon(Icons.directions_car, color: Colors.white, size: 80),
+                SizedBox(height: 10),
+                Text(
                   'GPLX Hạng B',
                   style: TextStyle(
                     color: Colors.white,
@@ -131,10 +112,15 @@ class _LoginScreenState extends State<LoginScreen> {
                       key: _formKey,
                       child: Column(
                         children: [
-                          // Sửa từ _usernameController thành _emailController
-                          _buildTextField(_emailController, 'Email', Icons.email),
+                          _buildTextField(
+                              _emailController, 'Email', Icons.email),
                           const SizedBox(height: 20),
-                          _buildTextField(_passwordController, 'Mật khẩu', Icons.lock, obscureText: true),
+                          _buildTextField(
+                            _passwordController,
+                            'Mật khẩu',
+                            Icons.lock,
+                            obscureText: true,
+                          ),
                           const SizedBox(height: 20),
                           if (_error.isNotEmpty)
                             Text(
@@ -148,11 +134,14 @@ class _LoginScreenState extends State<LoginScreen> {
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFF003366),
                               minimumSize: const Size(double.infinity, 50),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
                             ),
                             child: const Text(
                               'Đăng nhập',
-                              style: TextStyle(color: Colors.white, fontSize: 16),
+                              style: TextStyle(
+                                  color: Colors.white, fontSize: 16),
                             ),
                           ),
                           const SizedBox(height: 20),
@@ -160,7 +149,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             onPressed: () {
                               Navigator.push(
                                 context,
-                                MaterialPageRoute(builder: (_) => const RegisterScreen()),
+                                MaterialPageRoute(
+                                  builder: (_) => const RegisterScreen(),
+                                ),
                               );
                             },
                             child: const Text(
@@ -181,7 +172,12 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _buildTextField(TextEditingController controller, String hintText, IconData icon, {bool obscureText = false}) {
+  Widget _buildTextField(
+    TextEditingController controller,
+    String hintText,
+    IconData icon, {
+    bool obscureText = false,
+  }) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.grey[200],
@@ -194,7 +190,8 @@ class _LoginScreenState extends State<LoginScreen> {
           prefixIcon: Icon(icon, color: Colors.grey),
           hintText: hintText,
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(vertical: 15, horizontal: 10),
+          contentPadding:
+              const EdgeInsets.symmetric(vertical: 15, horizontal: 10),
         ),
         validator: (value) {
           if (value == null || value.isEmpty) {
